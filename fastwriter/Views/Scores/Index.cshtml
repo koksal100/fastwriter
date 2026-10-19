@@ -1,0 +1,92 @@
+@model fastwriter.ViewModels.ScoreHistoryViewModel
+@{
+    ViewData["Title"] = "Skorlarım";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 mb-3">
+    <div>
+        <h2 class="mb-1">Skorlarım</h2>
+        <p class="text-secondary mb-0">Kaydedilen denemelerinin özeti ve son 100 sonuç.</p>
+    </div>
+    <a class="btn btn-primary" asp-controller="Home" asp-action="Index">Yeni Test</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="stat-label">En İyi Net WPM</div>
+                <div class="stat-value text-success">@Model.BestNetWpm</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="stat-label">Ortalama Net WPM</div>
+                <div class="stat-value">@Model.AverageNetWpm</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="stat-label">Ortalama Doğruluk</div>
+                <div class="stat-value text-info">%@Model.AverageAccuracy.ToString("0.##")</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="stat-label">Toplam Deneme</div>
+                <div class="stat-value">@Model.TotalTests</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (Model.Scores.Count == 0)
+{
+    <div class="card bg-dark border-secondary">
+        <div class="card-body text-center py-5">
+            <h4>Henüz kayıtlı skorun yok</h4>
+            <p class="text-secondary">İlk testini tamamladığında skorun otomatik olarak burada görünecek.</p>
+            <a class="btn btn-primary" asp-controller="Home" asp-action="Index">Teste Başla</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="table-responsive card bg-dark border-secondary">
+        <table class="table table-dark table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th class="text-end">Net WPM</th>
+                    <th class="text-end">Ham WPM</th>
+                    <th class="text-end">Doğruluk</th>
+                    <th class="text-end">Doğru Karakter</th>
+                    <th class="text-end">Yanlış Karakter</th>
+                    <th class="text-end">Doğru Kelime</th>
+                    <th class="text-end">Süre</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var score in Model.Scores)
+                {
+                    <tr>
+                        <td>@score.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                        <td class="text-end fw-bold text-success">@score.NetWpm</td>
+                        <td class="text-end">@score.RawWpm</td>
+                        <td class="text-end">%@score.Accuracy.ToString("0.##")</td>
+                        <td class="text-end">@score.CorrectChars</td>
+                        <td class="text-end text-danger">@score.IncorrectChars</td>
+                        <td class="text-end">@score.CorrectWords</td>
+                        <td class="text-end">@score.DurationSeconds sn</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

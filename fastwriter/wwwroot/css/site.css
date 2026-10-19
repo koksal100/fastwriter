@@ -1,0 +1,197 @@
+html {
+  font-size: 14px;
+  position: relative;
+  min-height: 100%;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+body {
+  margin-bottom: 60px;
+  background-color: #121212;
+  color: #e0e0e0;
+}
+
+a {
+  color: #6ea8dc;
+}
+
+a:hover {
+  color: #9cc4ea;
+}
+
+.navbar-dark .navbar-nav .nav-link {
+  color: #cfcfcf;
+}
+
+.navbar-dark .navbar-nav .nav-link:hover,
+.navbar-dark .navbar-nav .nav-link:focus {
+  color: #ffffff;
+}
+
+.footer {
+  background-color: #1a1a1a;
+  color: #8a8a8a !important;
+  line-height: 50px;
+  border-color: #333 !important;
+}
+
+.card {
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  color: #e0e0e0;
+}
+
+.form-control,
+.form-check-input {
+  background-color: #2b2b2b;
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+.form-control:focus {
+  background-color: #2b2b2b;
+  border-color: #4a7db1;
+  color: #ffffff;
+  box-shadow: 0 0 0 0.2rem rgba(74, 125, 177, 0.25);
+}
+
+.form-control::placeholder {
+  color: #999;
+  opacity: 1;
+}
+
+.form-check-input:checked {
+  background-color: #4a7db1;
+  border-color: #4a7db1;
+}
+
+.auth-card {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.stat-card {
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8f9aa6;
+}
+
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+/* --- Yazma testi alanı --- */
+#text-display {
+  height: 350px;
+  overflow-y: auto;
+  user-select: none;
+  line-height: 2;
+  background-color: #1e1e1e;
+  border: 1px solid #333;
+  white-space: pre-wrap;
+  word-break: break-word;
+  scroll-behavior: smooth;
+}
+
+#text-display::-webkit-scrollbar {
+  width: 8px;
+}
+
+#text-display::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+#text-display::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 4px;
+}
+
+.char {
+  border-radius: 2px;
+}
+
+.char.pending {
+  color: #6c757d;
+}
+
+.char.correct {
+  color: #66d17a;
+}
+
+.char.incorrect {
+  color: #ff7b7b;
+  background-color: rgba(220, 53, 69, 0.28);
+  text-decoration: underline;
+  text-decoration-color: #ff4d4d;
+}
+
+.char.current {
+  background-color: rgba(74, 125, 177, 0.35);
+  box-shadow: inset 0 -2px 0 #4a7db1;
+}
+
+#text-input {
+  background-color: #2b2b2b;
+  border: 1px solid #444;
+  color: #e0e0e0;
+}
+
+#text-input:disabled {
+  background-color: #1a1a1a;
+  color: #777;
+}
+
+.result-header {
+  border-bottom: 1px solid #333;
+  padding-bottom: 10px;
+}
+
+.table-dark {
+  --bs-table-bg: #1a1a1a;
+  --bs-table-striped-bg: #202020;
+  --bs-table-hover-bg: #252525;
+  --bs-table-border-color: #333;
+}
+
+/* --- Liderlik tablosu --- */
+.leaderboard-tabs .nav-link {
+  color: #cfcfcf;
+  border: 1px solid #333;
+}
+
+.leaderboard-tabs .nav-link:hover {
+  color: #ffffff;
+  border-color: #4a7db1;
+}
+
+.leaderboard-tabs .nav-link.active {
+  background-color: #4a7db1;
+  border-color: #4a7db1;
+  color: #ffffff;
+}
+
+.leaderboard-medal {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.leaderboard-current {
+  background-color: rgba(74, 125, 177, 0.22) !important;
+}
+
+.leaderboard-current:hover {
+  background-color: rgba(74, 125, 177, 0.3) !important;
+}

@@ -1,0 +1,483 @@
+﻿@{
+    ViewData["Title"] = "Zabıt Katipliği Klavye Sınavı";
+}
+
+<div class="typing-page mt-3">
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card h-100">
+                <div class="card-body py-2">
+                    <div class="stat-label">Kalan Süre</div>
+                    <div class="stat-value"><span id="timer" class="text-danger">180</span> <small class="fs-6">sn</small></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card h-100">
+                <div class="card-body py-2">
+                    <div class="stat-label">Anlık Net WPM</div>
+                    <div class="stat-value text-info" id="live-wpm">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card h-100">
+                <div class="card-body py-2">
+                    <div class="stat-label">Anlık Doğruluk</div>
+                    <div class="stat-value text-success"><span id="live-accuracy">100.0</span><small class="fs-6">%</small></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card stat-card h-100">
+                <div class="card-body py-2">
+                    <div class="stat-label">Yazılan Karakter</div>
+                    <div class="stat-value" id="live-chars">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div class="text-secondary small" id="text-title">Metin yükleniyor...</div>
+        <button id="finish-btn" type="button" class="btn btn-outline-warning btn-sm" disabled>Testi Bitir</button>
+    </div>
+
+    <!-- Referans Metin Alanı: her karakter ayrı renklendirilir -->
+    <div id="text-display" class="p-4 rounded fs-4 mb-3" aria-label="Yazılacak metin">
+        Yükleniyor...
+    </div>
+
+    <!-- Kullanıcı Giriş Alanı -->
+    <input type="text" id="text-input" class="form-control fs-4 py-3"
+           placeholder="Teste başlamak için buraya tıklayıp yazmaya başlayın..."
+           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+
+    <p class="text-secondary small mt-2 mb-0">
+        Süre ilk tuşa bastığınızda başlar. Geri tuşuyla düzeltebilirsiniz; skor daima son metne göre hesaplanır.
+    </p>
+
+    @Html.AntiForgeryToken()
+
+    <!-- Sonuç Paneli -->
+    <div id="result-section" class="card mt-4 d-none">
+        <div class="card-body p-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4 result-header">
+                <h4 class="mb-0" style="color: #4A7DB1;">Sınav Sonucu</h4>
+                <span id="target-badge" class="badge fs-6 bg-secondary">Hedef: 90 kelime / 3 dk</span>
+            </div>
+
+            <div class="row fs-5 g-2">
+                <div class="col-md-6">
+                    <p class="d-flex justify-content-between text-secondary">
+                        <span>Net WPM <small>(doğru karakter)</small></span>
+                        <strong id="result-net-wpm" class="text-success">0</strong>
+                    </p>
+                    <p class="d-flex justify-content-between text-secondary">
+                        <span>Ham WPM <small>(tüm karakterler)</small></span>
+                        <strong id="result-raw-wpm" class="text-white">0</strong>
+                    </p>
+                    <p class="d-flex justify-content-between text-secondary">
+                        <span>Doğruluk</span>
+                        <strong id="result-accuracy" class="text-info">%0</strong>
+                    </p>
+                    <p class="d-flex justify-content-between text-secondary">
+                        <span>Doğru / Yanlış Karakter</span>
+                        <strong>
+                            <span id="result-correct-chars" class="text-success">0</span>
+                            <span class="text-secondary">/</span>
+                            <span id="result-incorrect-chars" class="text-danger">0</span>
+                        </strong>
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <p class="d-flex justify-content-between text-secondary">
+                        <span>Toplam Yazılan Karakter</span>
+                        <strong id="result-total-chars" class="text-white">0</strong>
+                    </p>
+                    <p class="d-flex justify-content-between text-secondary">
+                        <span>Doğru Yazılan Kelime</span>
+                        <strong id="result-correct-words" class="text-success">0</strong>
+                    </p>
+                    <p class="d-flex justify-content-between text-secondary">
+                        <span>Test Süresi</span>
+                        <strong id="result-duration" class="text-white">0 sn</strong>
+                    </p>
+                    <p class="d-flex justify-content-between text-secondary">
+                        <span>Sınav Hedefi</span>
+                        <strong class="text-warning">90 kelime / 3 dk</strong>
+                    </p>
+                </div>
+            </div>
+
+            <div id="save-status" class="alert alert-secondary mt-3 mb-0 d-none"></div>
+
+            <hr class="border-secondary mt-4" />
+            <div class="text-center mt-3">
+                <button type="button" class="btn btn-outline-light btn-lg px-4 mt-2" onclick="restartTest()">Tekrar Dene</button>
+                <a class="btn btn-outline-warning btn-lg px-4 mt-2 ms-2" asp-controller="Leaderboard" asp-action="Index">Liderlik Tablosu</a>
+                <a class="btn btn-outline-info btn-lg px-4 mt-2 ms-2" asp-controller="Scores" asp-action="Index">Skorlarım</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const textDisplay = document.getElementById('text-display');
+        const textInput = document.getElementById('text-input');
+        const timerElement = document.getElementById('timer');
+        const liveWpmElement = document.getElementById('live-wpm');
+        const liveAccuracyElement = document.getElementById('live-accuracy');
+        const liveCharsElement = document.getElementById('live-chars');
+        const resultSection = document.getElementById('result-section');
+        const finishButton = document.getElementById('finish-btn');
+        const saveStatus = document.getElementById('save-status');
+
+        const targetWordCount = 90;
+        const isAuthenticated = @(User.Identity?.IsAuthenticated == true ? "true" : "false");
+        const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+        let targetText = '';
+        let textId = 0;
+        let totalTime = 180;
+        let timeLeft = 180;
+        let timerInterval = null;
+        let startTime = 0;
+        let isRunning = false;
+        let isFinished = false;
+        let finalDuration = 0;
+        let charSpans = [];
+
+        function resetState() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            isRunning = false;
+            isFinished = false;
+            startTime = 0;
+            timeLeft = totalTime;
+            finalDuration = 0;
+
+            resultSection.classList.add('d-none');
+            saveStatus.className = 'alert alert-secondary mt-3 mb-0 d-none';
+            saveStatus.innerHTML = '';
+
+            textInput.value = '';
+            textInput.disabled = false;
+            textInput.classList.remove('is-invalid');
+            finishButton.disabled = true;
+
+            timerElement.textContent = totalTime;
+            liveWpmElement.textContent = '0';
+            liveAccuracyElement.textContent = '100.0';
+            liveCharsElement.textContent = '0';
+        }
+
+        async function initTest() {
+            resetState();
+            textDisplay.textContent = 'Metin yükleniyor...';
+
+            try {
+                const response = await fetch('/Home/GetTestText');
+
+                if (!response.ok) {
+                    throw new Error('Sınav metni yüklenemedi.');
+                }
+
+                const data = await response.json();
+
+                targetText = data.text || '';
+                textId = data.id || 0;
+                totalTime = data.durationSeconds || 180;
+                timeLeft = totalTime;
+                timerElement.textContent = totalTime;
+
+                document.getElementById('text-title').textContent = `${data.title} • ${data.category}`;
+
+                renderText();
+
+                textInput.maxLength = targetText.length;
+                textInput.value = '';
+                textInput.disabled = false;
+                textInput.focus();
+            } catch (error) {
+                textDisplay.textContent = 'Metin yüklenemedi. Lütfen sayfayı yenileyin.';
+                textInput.disabled = true;
+                finishButton.disabled = true;
+                console.error(error);
+            }
+        }
+
+        function renderText() {
+            textDisplay.innerHTML = '';
+            charSpans = new Array(targetText.length);
+
+            const fragment = document.createDocumentFragment();
+
+            for (let i = 0; i < targetText.length; i++) {
+                const span = document.createElement('span');
+                span.className = 'char pending';
+                span.textContent = targetText[i];
+                fragment.appendChild(span);
+                charSpans[i] = span;
+            }
+
+            textDisplay.appendChild(fragment);
+            textDisplay.scrollTop = 0;
+            updateCharClasses('');
+        }
+
+        function updateCharClasses(typed) {
+            for (let i = 0; i < charSpans.length; i++) {
+                const span = charSpans[i];
+                span.classList.remove('correct', 'incorrect', 'current');
+
+                if (i < typed.length) {
+                    span.classList.add(typed[i] === targetText[i] ? 'correct' : 'incorrect');
+                } else if (i === typed.length) {
+                    span.classList.add('current');
+                }
+            }
+
+            scrollToCurrent(typed.length);
+        }
+
+        function scrollToCurrent(index) {
+            if (charSpans.length === 0) {
+                return;
+            }
+
+            const current = charSpans[Math.min(index, charSpans.length - 1)];
+
+            if (!current) {
+                return;
+            }
+
+            const displayRect = textDisplay.getBoundingClientRect();
+            const rect = current.getBoundingClientRect();
+            const margin = 16;
+
+            if (rect.bottom > displayRect.bottom - margin || rect.top < displayRect.top + margin) {
+                textDisplay.scrollTop += rect.top - displayRect.top - (displayRect.height / 2);
+            }
+        }
+
+        textInput.addEventListener('input', () => {
+            if (isFinished) {
+                return;
+            }
+
+            if (!isRunning) {
+                startTest();
+            }
+
+            const typed = textInput.value;
+
+            updateCharClasses(typed);
+            updateLiveStats();
+            finishButton.disabled = false;
+
+            if (typed.length >= targetText.length) {
+                endTest();
+            }
+        });
+
+        textInput.addEventListener('paste', (event) => {
+            event.preventDefault();
+        });
+
+        finishButton.addEventListener('click', () => {
+            if (isRunning && !isFinished) {
+                endTest();
+            }
+        });
+
+        function startTest() {
+            isRunning = true;
+            startTime = performance.now();
+            finishButton.disabled = false;
+            timerInterval = setInterval(tick, 200);
+        }
+
+        function tick() {
+            if (!isRunning || isFinished) {
+                return;
+            }
+
+            const elapsed = (performance.now() - startTime) / 1000;
+            timeLeft = Math.max(0, totalTime - elapsed);
+            timerElement.textContent = Math.ceil(timeLeft);
+            updateLiveStats(elapsed);
+
+            if (timeLeft <= 0) {
+                endTest();
+            }
+        }
+
+        function updateLiveStats(elapsedOverride) {
+            const typed = textInput.value;
+            const elapsed = elapsedOverride ?? (isRunning ? (performance.now() - startTime) / 1000 : 0);
+            const metrics = computeMetrics(typed, elapsed);
+
+            liveCharsElement.textContent = typed.length;
+            liveAccuracyElement.textContent = metrics.totalChars > 0 ? metrics.accuracy.toFixed(1) : '100.0';
+            liveWpmElement.textContent = elapsed >= 1 ? metrics.netWpm : 0;
+        }
+
+        function computeMetrics(typed, elapsedSeconds) {
+            let correctChars = 0;
+            const compareLength = Math.min(typed.length, targetText.length);
+
+            for (let i = 0; i < compareLength; i++) {
+                if (typed[i] === targetText[i]) {
+                    correctChars++;
+                }
+            }
+
+            const totalChars = typed.length;
+            const incorrectChars = totalChars - correctChars;
+            const minutes = Math.max(elapsedSeconds, 1) / 60;
+            const netWpm = Math.round((correctChars / 5) / minutes);
+            const rawWpm = Math.round((totalChars / 5) / minutes);
+            const accuracy = totalChars > 0 ? (correctChars / totalChars) * 100 : 0;
+
+            return {
+                netWpm: netWpm,
+                rawWpm: rawWpm,
+                accuracy: accuracy,
+                correctChars: correctChars,
+                incorrectChars: incorrectChars,
+                totalChars: totalChars,
+                correctWords: countCorrectWords(typed)
+            };
+        }
+
+        function countCorrectWords(typed) {
+            const targetWords = targetText.split(' ').filter(Boolean);
+            const typedWords = typed.split(' ').filter(Boolean);
+            const compareLength = Math.min(targetWords.length, typedWords.length);
+            let correct = 0;
+
+            for (let i = 0; i < compareLength; i++) {
+                if (typedWords[i] === targetWords[i]) {
+                    correct++;
+                }
+            }
+
+            return correct;
+        }
+
+        function endTest() {
+            if (isFinished) {
+                return;
+            }
+
+            isFinished = true;
+            isRunning = false;
+            clearInterval(timerInterval);
+            timerInterval = null;
+
+            const elapsed = startTime > 0 ? (performance.now() - startTime) / 1000 : 0;
+            finalDuration = Math.max(1, Math.min(Math.round(elapsed), totalTime));
+
+            textInput.disabled = true;
+            finishButton.disabled = true;
+
+            timeLeft = Math.max(0, totalTime - finalDuration);
+            timerElement.textContent = Math.ceil(timeLeft);
+
+            updateCharClasses(textInput.value);
+
+            const metrics = computeMetrics(textInput.value, finalDuration);
+            showResults(metrics);
+
+            if (isAuthenticated) {
+                saveScore();
+            } else {
+                showSaveMessage(
+                    'Skorun kaydedilmedi. <a href="/Account/Login?returnUrl=%2F">Giriş yaparak</a> denemelerini saklayabilirsin.',
+                    'alert-info');
+            }
+        }
+
+        function showResults(metrics) {
+            document.getElementById('result-net-wpm').textContent = metrics.netWpm;
+            document.getElementById('result-raw-wpm').textContent = metrics.rawWpm;
+            document.getElementById('result-accuracy').textContent = `%${metrics.accuracy.toFixed(2)}`;
+            document.getElementById('result-correct-chars').textContent = metrics.correctChars;
+            document.getElementById('result-incorrect-chars').textContent = metrics.incorrectChars;
+            document.getElementById('result-total-chars').textContent = metrics.totalChars;
+            document.getElementById('result-correct-words').textContent = metrics.correctWords;
+            document.getElementById('result-duration').textContent = `${finalDuration} sn`;
+
+            const passed = metrics.correctWords >= targetWordCount && finalDuration >= totalTime - 1;
+            const badge = document.getElementById('target-badge');
+
+            badge.textContent = passed
+                ? 'Hedefi Geçtin ✓'
+                : `Hedef: ${targetWordCount} kelime / 3 dk`;
+            badge.className = passed ? 'badge fs-6 bg-success' : 'badge fs-6 bg-secondary';
+
+            resultSection.classList.remove('d-none');
+            resultSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        async function saveScore() {
+            showSaveMessage('Skor kaydediliyor...', 'alert-secondary');
+
+            try {
+                const response = await fetch('/api/scores', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': antiForgeryToken
+                    },
+                    body: JSON.stringify({
+                        textId: textId,
+                        typedText: textInput.value,
+                        durationSeconds: finalDuration
+                    })
+                });
+
+                if (response.status === 401) {
+                    showSaveMessage(
+                        'Oturumun sona ermiş. <a href="/Account/Login?returnUrl=%2F">Tekrar giriş yaparak</a> skorunu kaydedebilirsin.',
+                        'alert-warning');
+                    return;
+                }
+
+                if (!response.ok) {
+                    let message = 'Skor kaydedilemedi.';
+
+                    try {
+                        const error = await response.json();
+                        message = error.message || message;
+                    } catch {
+                        // JSON olmayan yanıt
+                    }
+
+                    throw new Error(message);
+                }
+
+                const saved = await response.json();
+
+                showSaveMessage(
+                    `Skor kaydedildi ✓ Sunucu doğrulaması: Net ${saved.netWpm} WPM, %${Number(saved.accuracy).toFixed(2)} doğruluk. <a href="/Scores">Skorlarım</a>`,
+                    'alert-success');
+            } catch (error) {
+                showSaveMessage(error.message || 'Skor kaydedilemedi. Lütfen tekrar dene.', 'alert-danger');
+            }
+        }
+
+        function showSaveMessage(html, alertClass) {
+            saveStatus.className = `alert ${alertClass} mt-3 mb-0`;
+            saveStatus.innerHTML = html;
+        }
+
+        function restartTest() {
+            initTest();
+        }
+
+        document.addEventListener('DOMContentLoaded', initTest);
+    </script>
+}

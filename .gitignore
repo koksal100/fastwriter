@@ -1,0 +1,20 @@
+# Build output
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+# Local SQLite database (contains user accounts and scores)
+*.db
+*.db-shm
+*.db-wal
+
+# Local secrets / environment overrides
+appsettings.*.local.json
+appsettings.Production.json
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
