@@ -5,6 +5,7 @@ using fastwriter.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace fastwriter.Controllers;
@@ -12,6 +13,7 @@ namespace fastwriter.Controllers;
 [ApiController]
 [Route("api/scores")]
 [Authorize]
+[EnableRateLimiting("scores")]
 public class ScoresApiController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -24,16 +26,16 @@ public class ScoresApiController : ControllerBase
     }
 
     /// <summary>
-    /// İstemciden gelen yazılan metni, veritabanındaki referans metinle karşılaştırarak
-    /// metrikleri sunucuda yeniden hesaplar ve skoru kaydeder.
+    /// İstemciden gelen yazılan metni, sunucudaki test oturumunun referans metniyle karşılaştırır.
+    /// Süre istemciden değil, oturumun sunucudaki başlangıç zamanından hesaplanır.
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Save([FromBody] ScoreSubmissionDto dto)
     {
-        if (dto.TextId <= 0)
+        if (dto.SessionId == Guid.Empty)
         {
-            return BadRequest(new { message = "Geçersiz sınav metni." });
+            return BadRequest(new { message = "Geçersiz test oturumu." });
         }
 
         var typedText = (dto.TypedText ?? string.Empty)
@@ -50,20 +52,6 @@ public class ScoresApiController : ControllerBase
             return BadRequest(new { message = "Yazılan metin izin verilen uzunluğu aşıyor." });
         }
 
-        if (dto.DurationSeconds < 3 || dto.DurationSeconds > ExamContent.DurationSeconds + 5)
-        {
-            return BadRequest(new { message = "Geçersiz test süresi." });
-        }
-
-        var text = await _db.TypingTexts
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t => t.Id == dto.TextId && t.IsActive);
-
-        if (text is null)
-        {
-            return NotFound(new { message = "Sınav metni bulunamadı." });
-        }
-
         var userId = _userManager.GetUserId(User);
 
         if (string.IsNullOrEmpty(userId))
@@ -71,8 +59,53 @@ public class ScoresApiController : ControllerBase
             return Unauthorized(new { message = "Skor kaydetmek için giriş yapmalısınız." });
         }
 
+        var session = await _db.TestSessions
+            .AsNoTracking()
+            .Include(s => s.TypingText)
+            .FirstOrDefaultAsync(s => s.Id == dto.SessionId);
+
+        if (session is null || session.UserId != userId)
+        {
+            return NotFound(new { message = "Geçerli bir test oturumu bulunamadı. Testi yeniden başlatın." });
+        }
+
+        if (session.CompletedAtUtc is not null)
+        {
+            return Conflict(new { message = "Bu test oturumu zaten kullanıldı. Testi yeniden başlatın." });
+        }
+
+        var now = DateTime.UtcNow;
+        var elapsed = now - session.StartedAtUtc;
+
+        if (elapsed > TestSessionRules.Lifetime)
+        {
+            return BadRequest(new { message = "Test oturumunun süresi doldu. Testi yeniden başlatın." });
+        }
+
+        if (elapsed.TotalSeconds < TestSessionRules.MinimumDurationSeconds)
+        {
+            return BadRequest(new { message = "Test süresi çok kısa. En az 3 saniye yazmalısınız." });
+        }
+
+        if (elapsed.TotalSeconds > ExamContent.DurationSeconds + TestSessionRules.MaximumGraceSeconds)
+        {
+            return BadRequest(new { message = "Test süresi aşıldı. Testi yeniden başlatın." });
+        }
+
+        var text = session.TypingText;
+
+        if (text is null || !text.IsActive)
+        {
+            return NotFound(new { message = "Sınav metni bulunamadı." });
+        }
+
+        // 180 saniyeye ulaşan denemelerde ağ gecikmesi için küçük bir tolerans tanınır.
+        var durationSeconds = elapsed.TotalSeconds >= ExamContent.DurationSeconds - TestSessionRules.FullExamToleranceSeconds
+            ? ExamContent.DurationSeconds
+            : (int)Math.Floor(elapsed.TotalSeconds);
+
         var target = ExamContent.Build(text.Content);
-        var metrics = TypingMetrics.Calculate(target, typedText, dto.DurationSeconds);
+        var metrics = TypingMetrics.Calculate(target, typedText, durationSeconds);
 
         var score = new Score
         {
@@ -85,12 +118,29 @@ public class ScoresApiController : ControllerBase
             IncorrectChars = metrics.IncorrectChars,
             TotalChars = metrics.TotalChars,
             CorrectWords = metrics.CorrectWords,
-            DurationSeconds = dto.DurationSeconds,
-            CreatedAt = DateTime.UtcNow
+            DurationSeconds = durationSeconds,
+            CreatedAt = now
         };
+
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+
+        // Oturumu koşullu olarak tek kullanımlık işaretle; aynı oturumla ikinci skor kaydını engelle.
+        var markedUsed = await _db.TestSessions
+            .Where(s => s.Id == session.Id
+                && s.UserId == userId
+                && s.CompletedAtUtc == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(s => s.CompletedAtUtc, (DateTime?)now));
+
+        if (markedUsed == 0)
+        {
+            await transaction.RollbackAsync();
+            return Conflict(new { message = "Bu test oturumu zaten kullanıldı. Testi yeniden başlatın." });
+        }
 
         _db.Scores.Add(score);
         await _db.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         return Ok(new
         {

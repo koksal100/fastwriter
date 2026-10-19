@@ -15,6 +15,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
     public DbSet<Score> Scores => Set<Score>();
 
+    public DbSet<TestSession> TestSessions => Set<TestSession>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -30,6 +32,22 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                 .WithMany(t => t.Scores)
                 .HasForeignKey(s => s.TypingTextId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<TestSession>(entity =>
+        {
+            entity.HasOne(s => s.User)
+                .WithMany(u => u.TestSessions)
+                .HasForeignKey(s => s.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(s => s.TypingText)
+                .WithMany()
+                .HasForeignKey(s => s.TypingTextId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(s => new { s.UserId, s.CompletedAtUtc });
+            entity.HasIndex(s => s.StartedAtUtc);
         });
     }
 }

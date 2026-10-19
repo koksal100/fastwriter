@@ -265,6 +265,36 @@ namespace fastwriter.Data.Migrations
                     b.ToTable("Scores");
                 });
 
+            modelBuilder.Entity("fastwriter.Models.TestSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TypingTextId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedAtUtc");
+
+                    b.HasIndex("TypingTextId");
+
+                    b.HasIndex("UserId", "CompletedAtUtc");
+
+                    b.ToTable("TestSessions");
+                });
+
             modelBuilder.Entity("fastwriter.Models.TypingText", b =>
                 {
                     b.Property<int>("Id")
@@ -367,9 +397,30 @@ namespace fastwriter.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("fastwriter.Models.TestSession", b =>
+                {
+                    b.HasOne("fastwriter.Models.TypingText", "TypingText")
+                        .WithMany()
+                        .HasForeignKey("TypingTextId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("fastwriter.Models.ApplicationUser", "User")
+                        .WithMany("TestSessions")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TypingText");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("fastwriter.Models.ApplicationUser", b =>
                 {
                     b.Navigation("Scores");
+
+                    b.Navigation("TestSessions");
                 });
 
             modelBuilder.Entity("fastwriter.Models.TypingText", b =>

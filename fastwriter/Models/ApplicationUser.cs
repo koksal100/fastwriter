@@ -9,4 +9,6 @@ public class ApplicationUser : IdentityUser
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<Score> Scores { get; set; } = new List<Score>();
+
+    public ICollection<TestSession> TestSessions { get; set; } = new List<TestSession>();
 }

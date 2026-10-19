@@ -148,6 +148,10 @@
         let isFinished = false;
         let finalDuration = 0;
         let charSpans = [];
+        let sessionId = null;
+        let sessionPromise = null;
+        let sessionError = null;
+        let testGeneration = 0;
 
         function resetState() {
             clearInterval(timerInterval);
@@ -157,6 +161,10 @@
             startTime = 0;
             timeLeft = totalTime;
             finalDuration = 0;
+            sessionId = null;
+            sessionPromise = null;
+            sessionError = null;
+            testGeneration++;
 
             resultSection.classList.add('d-none');
             saveStatus.className = 'alert alert-secondary mt-3 mb-0 d-none';
@@ -297,6 +305,72 @@
             startTime = performance.now();
             finishButton.disabled = false;
             timerInterval = setInterval(tick, 200);
+
+            if (isAuthenticated) {
+                ensureSession().catch(() => {
+                    // Hata, skor kaydı sırasında sonuç panelinde gösterilir.
+                });
+            }
+        }
+
+        function ensureSession() {
+            if (!isAuthenticated) {
+                return Promise.resolve(null);
+            }
+
+            if (sessionPromise) {
+                return sessionPromise;
+            }
+
+            const generation = testGeneration;
+
+            sessionPromise = fetch('/api/tests/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': antiForgeryToken
+                },
+                body: JSON.stringify({ textId: textId })
+            }).then(async (response) => {
+                if (response.status === 401) {
+                    throw new Error('Oturumun sona ermiş. Sayfayı yenileyip tekrar giriş yap.');
+                }
+
+                if (!response.ok) {
+                    let message = 'Test oturumu başlatılamadı.';
+
+                    try {
+                        const error = await response.json();
+                        message = error.message || message;
+                    } catch {
+                        // JSON olmayan yanıt
+                    }
+
+                    throw new Error(message);
+                }
+
+                const data = await response.json();
+
+                if (generation !== testGeneration) {
+                    throw new Error('Test yeniden başlatıldı.');
+                }
+
+                if (data.textId !== textId) {
+                    throw new Error('Sınav metni eşleşmedi. Sayfayı yenileyip tekrar dene.');
+                }
+
+                sessionId = data.sessionId;
+                return data;
+            }).catch((error) => {
+                if (generation === testGeneration) {
+                    sessionError = error.message || 'Test oturumu başlatılamadı.';
+                }
+
+                console.error(error);
+                throw error;
+            });
+
+            return sessionPromise;
         }
 
         function tick() {
@@ -426,6 +500,14 @@
             showSaveMessage('Skor kaydediliyor...', 'alert-secondary');
 
             try {
+                if (!sessionId) {
+                    await ensureSession();
+                }
+
+                if (!sessionId) {
+                    throw new Error(sessionError || 'Test oturumu bulunamadı. Testi yeniden başlatın.');
+                }
+
                 const response = await fetch('/api/scores', {
                     method: 'POST',
                     headers: {
@@ -433,9 +515,8 @@
                         'RequestVerificationToken': antiForgeryToken
                     },
                     body: JSON.stringify({
-                        textId: textId,
-                        typedText: textInput.value,
-                        durationSeconds: finalDuration
+                        sessionId: sessionId,
+                        typedText: textInput.value
                     })
                 });
 
@@ -460,13 +541,35 @@
                 }
 
                 const saved = await response.json();
+                applyServerResult(saved);
 
                 showSaveMessage(
-                    `Skor kaydedildi ✓ Sunucu doğrulaması: Net ${saved.netWpm} WPM, %${Number(saved.accuracy).toFixed(2)} doğruluk. <a href="/Scores">Skorlarım</a>`,
+                    `Skor kaydedildi ✓ Sunucu doğrulaması: Net ${saved.netWpm} WPM, %${Number(saved.accuracy).toFixed(2)} doğruluk, ${saved.durationSeconds} sn. <a href="/Scores">Skorlarım</a>`,
                     'alert-success');
             } catch (error) {
                 showSaveMessage(error.message || 'Skor kaydedilemedi. Lütfen tekrar dene.', 'alert-danger');
             }
+        }
+
+        function applyServerResult(saved) {
+            finalDuration = saved.durationSeconds;
+
+            document.getElementById('result-net-wpm').textContent = saved.netWpm;
+            document.getElementById('result-raw-wpm').textContent = saved.rawWpm;
+            document.getElementById('result-accuracy').textContent = `%${Number(saved.accuracy).toFixed(2)}`;
+            document.getElementById('result-correct-chars').textContent = saved.correctChars;
+            document.getElementById('result-incorrect-chars').textContent = saved.incorrectChars;
+            document.getElementById('result-total-chars').textContent = saved.totalChars;
+            document.getElementById('result-correct-words').textContent = saved.correctWords;
+            document.getElementById('result-duration').textContent = `${saved.durationSeconds} sn`;
+
+            const passed = saved.correctWords >= targetWordCount && saved.durationSeconds >= totalTime - 1;
+            const badge = document.getElementById('target-badge');
+
+            badge.textContent = passed
+                ? 'Hedefi Geçtin ✓'
+                : `Hedef: ${targetWordCount} kelime / 3 dk`;
+            badge.className = passed ? 'badge fs-6 bg-success' : 'badge fs-6 bg-secondary';
         }
 
         function showSaveMessage(html, alertClass) {

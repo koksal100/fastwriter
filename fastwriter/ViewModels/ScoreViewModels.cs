@@ -4,11 +4,10 @@ namespace fastwriter.ViewModels;
 
 public class ScoreSubmissionDto
 {
-    public int TextId { get; set; }
+    /// <summary>Sunucunun test başlarken ürettiği tek kullanımlık oturum kimliği.</summary>
+    public Guid SessionId { get; set; }
 
     public string TypedText { get; set; } = string.Empty;
-
-    public int DurationSeconds { get; set; }
 }
 
 public class ScoreHistoryViewModel

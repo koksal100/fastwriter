@@ -1,9 +1,23 @@
+using System.Security.Claims;
+using System.Threading.RateLimiting;
 using fastwriter.Data;
 using fastwriter.Models;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Reverse proxy (Caddy/Nginx) arkasında gerçek istemci IP'sini ve HTTPS şemasını al.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+    // Uygulama yalnızca güvenilir bir reverse proxy arkasında çalıştırılmalıdır.
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // --- Veritabanı (SQLite) ---
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -62,7 +76,89 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
 
 builder.Services.AddControllersWithViews();
 
+// --- Rate limiting ---
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Giriş / kayıt denemeleri: IP başına dakikada 10 istek.
+    options.AddPolicy("auth", httpContext =>
+    {
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            $"auth:{ip}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
+
+    // Skor kaydı: kullanıcı başına dakikada 10 istek.
+    options.AddPolicy("scores", httpContext =>
+    {
+        var key = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            $"scores:{key}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
+
+    // Test başlatma: kullanıcı başına 5 dakikada 20 istek.
+    options.AddPolicy("test-start", httpContext =>
+    {
+        var key = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            $"test-start:{key}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(5),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+        }
+
+        const string message = "Çok fazla istek gönderdiniz. Lütfen biraz sonra tekrar deneyin.";
+
+        if (context.HttpContext.Request.Path.StartsWithSegments("/api"))
+        {
+            await context.HttpContext.Response.WriteAsJsonAsync(new { message }, cancellationToken);
+        }
+        else
+        {
+            await context.HttpContext.Response.WriteAsync(message, cancellationToken);
+        }
+    };
+});
+
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -77,6 +173,7 @@ app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapStaticAssets();
 

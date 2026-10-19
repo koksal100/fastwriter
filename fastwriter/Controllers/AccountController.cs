@@ -4,6 +4,7 @@ using fastwriter.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace fastwriter.Controllers;
 
@@ -44,6 +45,7 @@ public class AccountController : Controller
     [HttpPost("Login")]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login(LoginViewModel model)
     {
         ViewBag.GoogleEnabled = IsGoogleEnabled;
@@ -92,6 +94,7 @@ public class AccountController : Controller
     [HttpPost("Register")]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> Register(RegisterViewModel model)
     {
         ViewBag.GoogleEnabled = IsGoogleEnabled;
@@ -136,6 +139,7 @@ public class AccountController : Controller
     [HttpPost("ExternalLogin")]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("auth")]
     public IActionResult ExternalLogin(string provider, string? returnUrl = null)
     {
         if (!IsGoogleEnabled)
